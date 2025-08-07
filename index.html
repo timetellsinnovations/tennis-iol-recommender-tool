@@ -3,21 +3,781 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self';">
-    <!-- WARNING: Use local Tailwind CSS for production instead of CDN -->
-    <title>TECNIS IOL Recommender Tool</title>
-    <!-- Tailwind CSS should be bundled and served locally for production. -->
-    <!-- <link rel="stylesheet" href="/path/to/tailwind.css"> -->
+    <title>TECNIS IOL Recommender</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Custom Tailwind Configuration */
+        :root {
+            --tecnis-red: #eb1700;
+            --dark-gray: #212529;
+            --light-gray: #f8f9fa;
+            --medium-gray: #6c757d;
+            --success-green: #53ce76;
+            --warning-yellow: #fbe058;
+        }
+
+        /* Basic styles for Inter font */
+        body {
+            font-family: 'Inter', sans-serif;
+            color: var(--dark-gray);
+            background-color: var(--light-gray);
+        }
+
+        /* Custom radio button styling */
+        .custom-radio input[type="radio"] {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .custom-radio label {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid var(--medium-gray);
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            background-color: white;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        .custom-radio label:hover {
+            border-color: var(--tecnis-red);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .custom-radio input[type="radio"]:checked + label {
+            background-color: var(--tecnis-red);
+            color: white;
+            border-color: var(--tecnis-red);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .custom-radio input[type="radio"]:checked + label .radio-dot {
+            background-color: white;
+            border-color: white;
+        }
+
+        .radio-dot {
+            height: 1.25rem;
+            width: 1.25rem;
+            background-color: white;
+            border: 2px solid var(--medium-gray);
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 0.75rem;
+            transition: all 0.2s ease-in-out;
+            flex-shrink: 0; /* Prevent dot from shrinking */
+        }
+
+        .custom-radio input[type="radio"]:checked + label .radio-dot {
+            background-color: white;
+            border-color: white;
+            box-shadow: inset 0 0 0 4px var(--tecnis-red); /* Inner circle effect */
+        }
+
+        /* Progress bar animation */
+        .progress-bar-fill {
+            transition: width 0.5s ease-in-out;
+        }
+
+        /* Button disabled state */
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* Fade-in for results */
+        .results-fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Loading spinner */
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: var(--tecnis-red);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-left: 0.5rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Print styles */
+        @media print {
+            body {
+                background-color: white;
+                color: black;
+            }
+            header, .progress-section, .reset-print-buttons, .gemini-feature-btn, .patient-explanation-section {
+                display: none;
+            }
+            .main-container {
+                flex-direction: column !important;
+                padding: 0 !important;
+            }
+            .questions-panel, .results-panel {
+                width: 100% !important;
+                padding: 1rem !important;
+                box-shadow: none !important;
+                border: none !important;
+            }
+            .results-panel {
+                margin-top: 2rem;
+            }
+            .disclaimer {
+                border-top: 1px solid #ccc;
+                padding-top: 1rem;
+                margin-top: 2rem;
+            }
+        }
+    </style>
 </head>
-<body>
-    <!-- Always host this application on HTTPS -->
-    <!-- Keep all dependencies up to date -->
+<body class="min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="bg-[var(--tecnis-red)] text-white p-4 shadow-lg">
+        <div class="container mx-auto flex items-center justify-between">
+            <h1 class="text-3xl font-bold">TECNIS IOL Recommender</h1>
+            <!-- Optional: Add a logo here if available -->
+            <!-- <img src="path/to/logo.png" alt="Company Logo" class="h-8"> -->
+        </div>
+    </header>
+
+    <main class="flex-grow container mx-auto p-4 md:p-8 flex flex-col md:flex-row gap-8">
+        <!-- Left Panel: Questions -->
+        <div class="questions-panel bg-white p-6 rounded-xl shadow-lg md:w-1/2 flex-shrink-0 md:sticky md:top-8 md:self-start">
+            <h2 class="text-2xl font-semibold mb-6 text-[var(--dark-gray)]">Patient Characteristics</h2>
+
+            <!-- Progress Bar -->
+            <div class="progress-section mb-8">
+                <div class="text-sm font-medium text-[var(--medium-gray)] mb-2" id="progress-text">Progress: 0 of 5 questions completed</div>
+                <div class="w-full bg-[var(--light-gray)] rounded-full h-2.5">
+                    <div class="progress-bar-fill bg-[var(--tecnis-red)] h-2.5 rounded-full" style="width: 0%;"></div>
+                </div>
+            </div>
+
+            <form id="iol-form" class="space-y-6">
+                <!-- Question 1: Corneal Astigmatism -->
+                <div class="question-group" data-question-id="astigmatism">
+                    <p class="text-lg font-medium mb-3">1. Does the patient have corneal astigmatism ≥1.0D?</p>
+                    <div class="flex flex-col sm:flex-row gap-4 custom-radio">
+                        <div>
+                            <input type="radio" id="astigmatism-yes" name="astigmatism" value="yes" aria-label="Yes, patient has corneal astigmatism">
+                            <label for="astigmatism-yes"><span class="radio-dot"></span>Yes</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="astigmatism-no" name="astigmatism" value="no" aria-label="No, patient does not have corneal astigmatism">
+                            <label for="astigmatism-no"><span class="radio-dot"></span>No</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Question 2: Presbyopia Correction -->
+                <div class="question-group" data-question-id="presbyopia">
+                    <p class="text-lg font-medium mb-3">2. Is presbyopia correction desired?</p>
+                    <div class="flex flex-col sm:flex-row gap-4 custom-radio">
+                        <div>
+                            <input type="radio" id="presbyopia-yes" name="presbyopia" value="yes" aria-label="Yes, presbyopia correction is desired">
+                            <label for="presbyopia-yes"><span class="radio-dot"></span>Yes</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="presbyopia-no" name="presbyopia" value="no" aria-label="No, presbyopia correction is not desired">
+                            <label for="presbyopia-no"><span class="radio-dot"></span>No</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Question 3: Visual Range Preference -->
+                <div class="question-group" data-question-id="visualRange">
+                    <p class="text-lg font-medium mb-3">3. What is the preferred visual range?</p>
+                    <div class="flex flex-col gap-4 custom-radio">
+                        <div>
+                            <input type="radio" id="range-distance" name="visualRange" value="distance-only" aria-label="Distance only (standard monofocal)">
+                            <label for="range-distance"><span class="radio-dot"></span>Distance only (standard monofocal)</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="range-extended" name="visualRange" value="extended-range" aria-label="Extended range (distance + intermediate)">
+                            <label for="range-extended"><span class="radio-dot"></span>Extended range (distance + intermediate)</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="range-full" name="visualRange" value="full-range" aria-label="Full range (distance to near)">
+                            <label for="range-full"><span class="radio-dot"></span>Full range (distance to near)</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Question 4: Diffractive Optics -->
+                <div class="question-group" data-question-id="diffractiveOptics">
+                    <p class="text-lg font-medium mb-3">4. Does the patient prefer non-diffractive optics?</p>
+                    <div class="flex flex-col sm:flex-row gap-4 custom-radio">
+                        <div>
+                            <input type="radio" id="diffractive-yes" name="diffractiveOptics" value="yes-prefer-non-diffractive" aria-label="Yes, prefer non-diffractive (fewer halos)">
+                            <label for="diffractive-yes"><span class="radio-dot"></span>Yes, prefer non-diffractive (fewer halos)</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="diffractive-no" name="diffractiveOptics" value="no-preference" aria-label="No preference regarding diffractive optics">
+                            <label for="diffractive-no"><span class="radio-dot"></span>No preference</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Question 5: Night Vision Priority -->
+                <div class="question-group" data-question-id="nightVision">
+                    <p class="text-lg font-medium mb-3">5. Is optimal night vision quality important?</p>
+                    <div class="flex flex-col sm:flex-row gap-4 custom-radio">
+                        <div>
+                            <input type="radio" id="nightvision-yes" name="nightVision" value="yes-very-important" aria-label="Yes, optimal night vision quality is very important">
+                            <label for="nightvision-yes"><span class="radio-dot"></span>Yes, very important</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="nightvision-no" name="nightVision" value="not-primary-concern" aria-label="No, night vision quality is not a primary concern">
+                            <label for="nightvision-no"><span class="radio-dot"></span>Not a primary concern</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Generate Button -->
+                <button type="button" id="generate-btn" class="w-full py-3 px-6 bg-[var(--tecnis-red)] text-white font-bold rounded-lg shadow-md hover:bg-red-700 transition duration-300 ease-in-out transform hover:scale-105 disabled:opacity-60 disabled:cursor-not-allowed" disabled>
+                    Generate Recommendation
+                </button>
+            </form>
+
+            <!-- Reset and Print Buttons -->
+            <div class="reset-print-buttons mt-6 flex flex-col sm:flex-row gap-4">
+                <button type="button" id="reset-btn" class="flex-1 py-2 px-4 bg-gray-200 text-[var(--dark-gray)] font-semibold rounded-lg shadow-sm hover:bg-gray-300 transition duration-300 ease-in-out">
+                    Reset
+                </button>
+                <button type="button" id="print-btn" class="flex-1 py-2 px-4 bg-gray-200 text-[var(--dark-gray)] font-semibold rounded-lg shadow-sm hover:bg-gray-300 transition duration-300 ease-in-out">
+                    Print Recommendations
+                </button>
+            </div>
+        </div>
+
+        <!-- Right Panel: Results -->
+        <div class="results-panel bg-white p-6 rounded-xl shadow-lg md:w-1/2 flex-grow flex flex-col justify-start">
+            <h2 class="text-2xl font-semibold mb-6 text-[var(--dark-gray)]">Clinical Recommendations</h2>
+
+            <div id="results-content" class="text-center text-[var(--medium-gray)] py-10">
+                <p>Please answer all questions to generate recommendations.</p>
+                <p class="mt-2">Your recommendations will appear here.</p>
+            </div>
+
+            <div id="recommendations-display" class="hidden flex-grow flex flex-col justify-start results-fade-in">
+                <div class="mb-6">
+                    <p class="text-lg font-bold text-[var(--success-green)] mb-2">Clinical Recommendations Generated <span class="text-xl">&#10003;</span></p>
+                    <p class="text-base text-[var(--dark-gray)]">Based on the patient's characteristics, here are the recommended TECNIS IOLs:</p>
+                </div>
+
+                <!-- Primary Recommendation -->
+                <div id="primary-recommendation" class="mb-8 p-4 border border-[var(--tecnis-red)] rounded-lg shadow-md bg-red-50">
+                    <h3 class="text-xl font-bold text-[var(--tecnis-red)] mb-2">1. Primary Recommendation: <span id="primary-iol-name"></span></h3>
+                    <p class="text-base text-[var(--dark-gray)] mb-2"><span class="font-semibold">Clinical Rationale:</span> <span id="primary-iol-rationale"></span></p>
+                    <p class="text-base font-semibold text-[var(--dark-gray)] mb-1">Key Benefits:</p>
+                    <ul id="primary-iol-benefits" class="list-disc list-inside text-sm text-[var(--dark-gray)] pl-4 space-y-1">
+                        <!-- Benefits will be dynamically inserted here -->
+                    </ul>
+                    <button type="button" class="gemini-feature-btn mt-4 w-full py-2 px-4 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition duration-300 ease-in-out" data-iol-target="primary">
+                        Generate Patient Explanation ✨
+                    </button>
+                    <div id="primary-patient-explanation" class="patient-explanation-section hidden mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-800">
+                        <div class="flex items-center justify-center py-4" id="primary-loading-spinner" style="display: none;">
+                            <div class="spinner"></div>
+                            <span class="ml-2">Generating explanation...</span>
+                        </div>
+                        <p id="primary-explanation-text"></p>
+                    </div>
+                </div>
+
+                <!-- Alternative Recommendation -->
+                <div id="alternative-recommendation" class="p-4 border border-gray-300 rounded-lg shadow-sm bg-gray-50">
+                    <h3 class="text-xl font-bold text-[var(--dark-gray)] mb-2">2. Alternative Recommendation: <span id="alternative-iol-name"></span></h3>
+                    <p class="text-base text-[var(--dark-gray)] mb-2"><span class="font-semibold">Clinical Rationale:</span> <span id="alternative-iol-rationale"></span></p>
+                    <p class="text-base font-semibold text-[var(--dark-gray)] mb-1">Key Benefits:</p>
+                    <ul id="alternative-iol-benefits" class="list-disc list-inside text-sm text-[var(--dark-gray)] pl-4 space-y-1">
+                        <!-- Benefits will be dynamically inserted here -->
+                    </ul>
+                    <button type="button" class="gemini-feature-btn mt-4 w-full py-2 px-4 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition duration-300 ease-in-out" data-iol-target="alternative">
+                        Generate Patient Explanation ✨
+                    </button>
+                    <div id="alternative-patient-explanation" class="patient-explanation-section hidden mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-800">
+                        <div class="flex items-center justify-center py-4" id="alternative-loading-spinner" style="display: none;">
+                            <div class="spinner"></div>
+                            <span class="ml-2">Generating explanation...</span>
+                        </div>
+                        <p id="alternative-explanation-text"></p>
+                    </div>
+                </div>
+
+                <!-- Professional Disclaimer -->
+                <div class="disclaimer mt-8 p-4 bg-[var(--warning-yellow)] bg-opacity-20 text-[var(--dark-gray)] rounded-lg border border-[var(--warning-yellow)]">
+                    <p class="font-bold text-sm mb-1">Disclaimer:</p>
+                    <p class="text-sm">This tool provides evidence-based clinical guidance. The final selection of the TECNIS IOL for any patient is a medical decision that must be made by a qualified ophthalmologist based on a comprehensive patient examination, clinical judgment, and patient preferences. This tool is not a substitute for professional medical advice.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
     <script>
-        // WARNING: Do not expose API keys in frontend code!
-        // WARNING: If you add text fields in the future, sanitize input to prevent XSS attacks.
-        // WARNING: Ensure only non-sensitive data is stored in localStorage.
+        // TECNIS IOL Database
+        const iolDatabase = [
+            {
+                name: "TECNIS 1-Piece (ZCB00)",
+                models: "5.0-34.0D range",
+                benefits: [
+                    "Aspheric aberration-correcting optic for enhanced image quality",
+                    "UV-blocking for retinal protection",
+                    "Simplicity delivery system for ease of implantation"
+                ]
+            },
+            {
+                name: "TECNIS OptiBlue™ (DCB00)",
+                models: "5.0-34.0D range",
+                benefits: [
+                    "Violet-light filter for enhanced contrast sensitivity",
+                    "Reduced halos and glare for improved visual comfort",
+                    "Optimized for night driving conditions"
+                ]
+            },
+            {
+                name: "TECNIS Toric II (ZCU series)",
+                models: "1.5D-6.0D cylinder correction",
+                benefits: [
+                    "Precise astigmatism correction",
+                    "Frosted haptics for excellent rotational stability",
+                    "Platinum injector for smooth, controlled delivery"
+                ]
+            },
+            {
+                name: "TECNIS Eyhance™ (DIB00)",
+                models: "5.0-34.0D range",
+                benefits: [
+                    "Extended depth of focus (EDOF) for improved intermediate vision",
+                    "Monofocal-like visual disturbance profile (minimal halos)",
+                    "Excellent distance vision"
+                ]
+            },
+            {
+                name: "TECNIS Eyhance™ Toric II (DIU series)",
+                models: "5.0-34.0D, cylinders 1.5D-6.0D",
+                benefits: [
+                    "EDOF technology combined with astigmatism correction",
+                    "High rotational stability (≈100% lenses within ±5°)",
+                    "Provides clear distance and enhanced intermediate vision"
+                ]
+            },
+            {
+                name: "TECNIS Symfony™ OptiBlue (ZXR00V)",
+                models: "5.0-34.0D range",
+                benefits: [
+                    "Echelette design for extended depth of focus",
+                    "InteliLight™ technology for reduced dysphotopsia (halos/glare)",
+                    "Provides continuous, high-quality vision at distance and intermediate"
+                ]
+            },
+            {
+                name: "TECNIS Symfony™ Toric II OptiBlue (ZXW series)",
+                models: "Cylinders 1.5D-6.0D",
+                benefits: [
+                    "EDOF and astigmatism correction in one lens",
+                    "Preloaded delivery system for efficient implantation",
+                    "Excellent rotational stability for precise astigmatism management"
+                ]
+            },
+            {
+                name: "TECNIS Synergy™ (ZFR00V)",
+                models: "5.0-34.0D range",
+                benefits: [
+                    "Hybrid multifocal-EDOF technology for panfocal vision",
+                    "Seamless vision from distance to near",
+                    "High spectacle independence across all ranges"
+                ]
+            },
+            {
+                name: "TECNIS Synergy™ Toric II (ZFW series)",
+                models: "Cylinders 1.5D-6.0D",
+                benefits: [
+                    "Full-range vision combined with astigmatism correction",
+                    "Designed for high spectacle independence",
+                    "Excellent rotational stability for toric performance"
+                ]
+            },
+            {
+                name: "TECNIS Odyssey™ (DRN00V)",
+                models: "5.0-34.0D range",
+                benefits: [
+                    "Free-form diffractive design for continuous vision",
+                    "Eliminates focal gaps for a smooth visual experience",
+                    "2x better low-light contrast compared to other multifocals"
+                ]
+            },
+            {
+                name: "TECNIS Odyssey™ Toric II (DRT series)",
+                models: "Cylinders 1.5D-6.0D",
+                benefits: [
+                    "Next-gen optics with toric stability for astigmatism correction",
+                    "Provides full-range vision with minimal visual disturbances",
+                    "Enhanced low-light performance"
+                ]
+            }
+        ];
+
+        // State to store selected answers
+        const answers = {
+            astigmatism: null,
+            presbyopia: null,
+            visualRange: null,
+            diffractiveOptics: null,
+            nightVision: null
+        };
+
+        const totalQuestions = Object.keys(answers).length;
+        const form = document.getElementById('iol-form');
+        const progressText = document.getElementById('progress-text');
+        const progressBarFill = document.querySelector('.progress-bar-fill');
+        const generateBtn = document.getElementById('generate-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const printBtn = document.getElementById('print-btn');
+        const resultsContent = document.getElementById('results-content');
+        const recommendationsDisplay = document.getElementById('recommendations-display');
+        const geminiFeatureButtons = document.querySelectorAll('.gemini-feature-btn');
+
+        // Function to update progress bar and button state
+        function updateProgress() {
+            let completedQuestions = 0;
+            for (const key in answers) {
+                if (answers[key] !== null) {
+                    completedQuestions++;
+                }
+            }
+            const progressPercentage = (completedQuestions / totalQuestions) * 100;
+            progressText.textContent = `Progress: ${completedQuestions} of ${totalQuestions} questions completed`;
+            progressBarFill.style.width = `${progressPercentage}%`;
+
+            generateBtn.disabled = completedQuestions < totalQuestions;
+
+            // If all questions are answered, show the generate button as ready
+            if (completedQuestions === totalQuestions) {
+                generateBtn.classList.add('bg-[var(--tecnis-red)]', 'hover:bg-red-700');
+                generateBtn.classList.remove('bg-gray-400');
+            } else {
+                generateBtn.classList.remove('bg-[var(--tecnis-red)]', 'hover:bg-red-700');
+                generateBtn.classList.add('bg-gray-400');
+            }
+        }
+
+        // Function to find an IOL by its partial name
+        function findIOL(namePart) {
+            return iolDatabase.find(iol => iol.name.includes(namePart));
+        }
+
+        // Recommendation Algorithm Logic
+        function getRecommendation() {
+            const { astigmatism, presbyopia, visualRange, diffractiveOptics, nightVision } = answers;
+
+            let primaryIOL = null;
+            let alternativeIOL = null;
+            let rationale = "";
+
+            if (astigmatism === 'yes') { // IF astigmatism ≥1.0D
+                if (presbyopia === 'yes') { // IF presbyopia desired
+                    if (visualRange === 'full-range' && diffractiveOptics === 'no-preference' && nightVision === 'not-primary-concern') {
+                        // IF full range + diffractive OK + night vision not priority
+                        primaryIOL = findIOL('Odyssey™ Toric II');
+                        alternativeIOL = findIOL('Synergy™ Toric II');
+                        rationale = "Optimal for full-range vision with astigmatism correction and excellent visual quality.";
+                    } else if (visualRange === 'extended-range' || diffractiveOptics === 'yes-prefer-non-diffractive' || nightVision === 'yes-very-important') {
+                        // IF extended range OR diffractive avoid OR night vision priority
+                        primaryIOL = findIOL('Eyhance™ Toric II');
+                        alternativeIOL = findIOL('Symfony™ Toric II OptiBlue');
+                        rationale = "Non-diffractive extended depth of focus minimizes dysphotopsia while enhancing intermediate vision with astigmatism correction.";
+                    } else if (visualRange === 'distance-only') {
+                        // IF distance only
+                        primaryIOL = findIOL('TECNIS Toric II');
+                        alternativeIOL = findIOL('Eyhance™ Toric II');
+                        rationale = "Provides excellent distance vision with astigmatism correction.";
+                    }
+                } else { // IF no presbyopia
+                    if (nightVision === 'yes-very-important') {
+                        // IF night vision priority
+                        primaryIOL = findIOL('TECNIS OptiBlue™');
+                        alternativeIOL = findIOL('TECNIS Toric II');
+                        rationale = "Violet-light filtering technology reduces halos and improves contrast sensitivity for night driving, with astigmatism consideration.";
+                    } else { // ELSE
+                        primaryIOL = findIOL('TECNIS Toric II');
+                        alternativeIOL = findIOL('Eyhance™ Toric II');
+                        rationale = "Standard astigmatism correction with options for enhanced intermediate vision.";
+                    }
+                }
+            } else { // IF no significant astigmatism
+                if (presbyopia === 'yes') { // IF presbyopia desired
+                    if (visualRange === 'full-range' && diffractiveOptics === 'no-preference' && nightVision === 'not-primary-concern') {
+                        // IF full range + diffractive OK + night vision not priority
+                        primaryIOL = findIOL('Odyssey™ (DRN00V)'); // Specify non-toric for clarity
+                        alternativeIOL = findIOL('Synergy™ (ZFR00V)'); // Specify non-toric for clarity
+                        rationale = "Latest free-form diffractive design eliminates focal gaps for continuous vision range.";
+                    } else if (visualRange === 'extended-range' || diffractiveOptics === 'yes-prefer-non-diffractive' || nightVision === 'yes-very-important') {
+                        // IF extended range OR diffractive avoid OR night vision priority
+                        primaryIOL = findIOL('Eyhance™ (DIB00)'); // Specify non-toric for clarity
+                        alternativeIOL = findIOL('Symfony™ OptiBlue (ZXR00V)'); // Specify non-toric for clarity
+                        rationale = "Non-diffractive extended depth of focus minimizes dysphotopsia while enhancing intermediate vision.";
+                    } else if (visualRange === 'distance-only') {
+                        // IF distance focus
+                        primaryIOL = findIOL('Symfony™ OptiBlue (ZXR00V)'); // Specify non-toric for clarity
+                        alternativeIOL = findIOL('Synergy™ (ZFR00V)'); // Specify non-toric for clarity
+                        rationale = "Provides extended depth of focus for enhanced distance and intermediate vision, even when primary focus is distance.";
+                    }
+                } else { // IF no presbyopia
+                    if (nightVision === 'yes-very-important') {
+                        // IF night vision priority
+                        primaryIOL = findIOL('TECNIS OptiBlue™ (DCB00)'); // Specify non-toric for clarity
+                        alternativeIOL = findIOL('TECNIS 1-Piece (ZCB00)'); // Specify non-toric for clarity
+                        rationale = "Violet-light filtering technology reduces halos and improves contrast sensitivity for night driving.";
+                    } else { // ELSE
+                        primaryIOL = findIOL('Eyhance™ (DIB00)'); // Specify non-toric for clarity
+                        alternativeIOL = findIOL('TECNIS 1-Piece (ZCB00)'); // Specify non-toric for clarity
+                        rationale = "Enhanced monofocal provides improved intermediate vision without compromising distance, or standard monofocal for clear distance vision.";
+                    }
+                }
+            }
+
+            return { primaryIOL, alternativeIOL, rationale };
+        }
+
+        // Function to display recommendations
+        function displayRecommendations() {
+            const { primaryIOL, alternativeIOL, rationale } = getRecommendation();
+
+            if (!primaryIOL) {
+                resultsContent.innerHTML = `<p class="text-center text-[var(--medium-gray)] py-10">No specific recommendation found for the selected criteria. Please review your choices.</p>`;
+                recommendationsDisplay.classList.add('hidden');
+                resultsContent.classList.remove('hidden');
+                return;
+            }
+
+            // Show results panel and hide initial message
+            resultsContent.classList.add('hidden');
+            recommendationsDisplay.classList.remove('hidden');
+
+            // Populate Primary Recommendation
+            document.getElementById('primary-iol-name').textContent = primaryIOL.name;
+            document.getElementById('primary-iol-rationale').textContent = rationale;
+            const primaryBenefitsList = document.getElementById('primary-iol-benefits');
+            primaryBenefitsList.innerHTML = ''; // Clear previous benefits
+            primaryIOL.benefits.forEach(benefit => {
+                const li = document.createElement('li');
+                li.textContent = benefit;
+                primaryBenefitsList.appendChild(li);
+            });
+
+            // Populate Alternative Recommendation
+            document.getElementById('alternative-iol-name').textContent = alternativeIOL ? alternativeIOL.name : 'N/A';
+            document.getElementById('alternative-iol-rationale').textContent = alternativeIOL ? rationale : 'No alternative found for these criteria.';
+            const alternativeBenefitsList = document.getElementById('alternative-iol-benefits');
+            alternativeBenefitsList.innerHTML = ''; // Clear previous benefits
+            if (alternativeIOL) {
+                alternativeIOL.benefits.forEach(benefit => {
+                    const li = document.createElement('li');
+                    li.textContent = benefit;
+                    alternativeBenefitsList.appendChild(li);
+                });
+            } else {
+                const li = document.createElement('li');
+                li.textContent = 'No specific benefits for this alternative.';
+                alternativeBenefitsList.appendChild(li);
+            }
+
+            // Hide any previous patient explanations
+            document.getElementById('primary-patient-explanation').classList.add('hidden');
+            document.getElementById('alternative-patient-explanation').classList.add('hidden');
+            document.getElementById('primary-explanation-text').textContent = '';
+            document.getElementById('alternative-explanation-text').textContent = '';
+        }
+
+        // Function to handle Gemini API call for patient explanation with exponential backoff
+        async function generatePatientExplanation(iolName, targetElementId, loadingSpinnerId) {
+            const targetExplanationDiv = document.getElementById(targetElementId);
+            const loadingSpinner = document.getElementById(loadingSpinnerId);
+            const explanationTextElement = targetExplanationDiv.querySelector('p');
+
+            targetExplanationDiv.classList.remove('hidden');
+            explanationTextElement.textContent = ''; // Clear previous text
+            loadingSpinner.style.display = 'flex'; // Show spinner
+
+            const prompt = `Explain the TECNIS ${iolName} intraocular lens in simple terms for a patient, focusing on its main benefits and what they can expect from their vision. Keep it concise, friendly, and easy to understand, avoiding medical jargon.`;
+
+            let chatHistory = [];
+            chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+            const payload = { contents: chatHistory };
+            const apiKey = ""; // If you want to use models other than gemini-2.5-flash-preview-05-20 or imagen-3.0-generate-002, provide an API key here. Otherwise, leave this as-is.
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+            let retryCount = 0;
+            const maxRetries = 5;
+            const baseDelay = 1000; // 1 second
+
+            while (retryCount < maxRetries) {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        if (response.status === 429 && retryCount < maxRetries - 1) { // Too Many Requests
+                            const delay = baseDelay * Math.pow(2, retryCount);
+                            console.warn(`Rate limit hit. Retrying in ${delay / 1000} seconds...`);
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            retryCount++;
+                            continue;
+                        }
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    if (result.candidates && result.candidates.length > 0 &&
+                        result.candidates[0].content && result.candidates[0].content.parts &&
+                        result.candidates[0].content.parts.length > 0) {
+                        const text = result.candidates[0].content.parts[0].text;
+                        explanationTextElement.textContent = text;
+                    } else {
+                        explanationTextElement.textContent = "Could not generate explanation. Please try again.";
+                    }
+                    break; // Exit loop on success
+                } catch (error) {
+                    console.error('Error generating explanation:', error);
+                    explanationTextElement.textContent = "Failed to generate explanation due to a network error. Please try again.";
+                    break; // Exit loop on error
+                } finally {
+                    loadingSpinner.style.display = 'none'; // Hide spinner
+                }
+            }
+
+            if (retryCount === maxRetries) {
+                explanationTextElement.textContent = "Failed to generate explanation after multiple retries. Please try again later.";
+                loadingSpinner.style.display = 'none';
+            }
+        }
+
+        // Event listener for form changes (radio button selections)
+        form.addEventListener('change', (event) => {
+            const name = event.target.name;
+            const value = event.target.value;
+            if (answers.hasOwnProperty(name)) {
+                answers[name] = value;
+            }
+            updateProgress();
+            saveState(); // Save state on every change
+        });
+
+        // Event listener for Generate button
+        generateBtn.addEventListener('click', () => {
+            if (!generateBtn.disabled) {
+                displayRecommendations();
+            }
+        });
+
+        // Event listener for Reset button
+        resetBtn.addEventListener('click', () => {
+            form.reset(); // Resets all radio buttons
+            for (const key in answers) {
+                answers[key] = null; // Clear state
+            }
+            updateProgress();
+            resultsContent.classList.remove('hidden');
+            recommendationsDisplay.classList.add('hidden');
+            resultsContent.innerHTML = `<p class="text-center text-[var(--medium-gray)] py-10">Please answer all questions to generate recommendations.</p><p class="mt-2">Your recommendations will appear here.</p>`;
+            localStorage.removeItem('tecnisIOLState'); // Clear saved state
+            // Hide and clear patient explanations on reset
+            document.getElementById('primary-patient-explanation').classList.add('hidden');
+            document.getElementById('alternative-patient-explanation').classList.add('hidden');
+            document.getElementById('primary-explanation-text').textContent = '';
+            document.getElementById('alternative-explanation-text').textContent = '';
+        });
+
+        // Event listener for Print button
+        printBtn.addEventListener('click', () => {
+            window.print();
+        });
+
+        // Event listeners for Gemini feature buttons
+        document.querySelectorAll('.gemini-feature-btn').forEach(button => {
+            button.addEventListener('click', (event) => {
+                const target = event.target.dataset.iolTarget; // 'primary' or 'alternative'
+                let iolName = '';
+                let explanationDivId = '';
+                let loadingSpinnerId = '';
+
+                if (target === 'primary') {
+                    iolName = document.getElementById('primary-iol-name').textContent;
+                    explanationDivId = 'primary-patient-explanation';
+                    loadingSpinnerId = 'primary-loading-spinner';
+                } else if (target === 'alternative') {
+                    iolName = document.getElementById('alternative-iol-name').textContent;
+                    explanationDivId = 'alternative-patient-explanation';
+                    loadingSpinnerId = 'alternative-loading-spinner';
+                }
+
+                if (iolName && iolName !== 'N/A') {
+                    generatePatientExplanation(iolName, explanationDivId, loadingSpinnerId);
+                } else {
+                    const explanationTextElement = document.getElementById(explanationDivId).querySelector('p');
+                    explanationTextElement.textContent = "No IOL selected for explanation.";
+                    document.getElementById(explanationDivId).classList.remove('hidden');
+                }
+            });
+        });
+
+
+        // Save state to localStorage
+        function saveState() {
+            localStorage.setItem('tecnisIOLState', JSON.stringify(answers));
+        }
+
+        // Load state from localStorage
+        function loadState() {
+            const savedState = localStorage.getItem('tecnisIOLState');
+            if (savedState) {
+                const loadedAnswers = JSON.parse(savedState);
+                for (const key in loadedAnswers) {
+                    if (answers.hasOwnProperty(key)) {
+                        answers[key] = loadedAnswers[key];
+                        // Set the radio button state in the UI
+                        const radioInput = document.querySelector(`input[name="${key}"][value="${loadedAnswers[key]}"]`);
+                        if (radioInput) {
+                            radioInput.checked = true;
+                        }
+                    }
+                }
+            }
+            updateProgress();
+            // If all questions were answered previously, display recommendations on load
+            if (Object.values(answers).every(val => val !== null)) {
+                displayRecommendations();
+            }
+        }
+
+        // Initial load
+        window.onload = () => {
+            loadState();
+        };
+
     </script>
 </body>
 </html>
